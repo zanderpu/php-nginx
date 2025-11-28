@@ -44,7 +44,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          # 校验Tag合法性（Docker不允许的字符：/ : < > " / \ | ? * 空格）
+          # 校验Tag合法性
           if [[ ${{ steps.set_tag.outputs.IMAGE_TAG }} =~ [/:<>\"\\|?* ] ]]; then
               echo "错误：镜像Tag包含非法字符！"
               exit 1
