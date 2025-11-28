@@ -6,8 +6,8 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      custom_tag:  # 手动触发时可输入自定义Tag
-        description: '自定义镜像Tag（如1.0.0、latest，不能包含/、空格等）'
+      custom_tag:
+        description: '自定义镜像Tag（如1.0.0、latest，不能包含/ : < > " \ | ? * 空格）'
         required: true
         default: 'latest'
 
@@ -23,13 +23,13 @@ jobs:
 
       - name: Set image name and tag
         id: set_tag
+        # 关键1：显式指定bash执行，避免dash兼容问题
+        shell: bash
         run: |
           if [[ $GITHUB_REF == refs/tags/* ]]; then
-              # Tag触发
               IMAGE_TAG=${GITHUB_REF#refs/tags/v}
               RELEASE_TAG=${GITHUB_REF#refs/tags/}
           else
-              # 手动触发：使用输入的custom_tag
               IMAGE_TAG=${{ github.event.inputs.custom_tag }}
               RELEASE_TAG="manual-${IMAGE_TAG}"
           fi
@@ -43,12 +43,17 @@ jobs:
           echo "RELEASE_TAG=${RELEASE_TAG}" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
+        # 关键2：显式指定bash，并用grep替代=~做合法性校验（避免<>语法错误）
+        shell: bash
         run: |
-          # 校验Tag合法性
-          if [[ ${{ steps.set_tag.outputs.IMAGE_TAG }} =~ [/:<>\"\\|?* ] ]]; then
-              echo "错误：镜像Tag包含非法字符！"
+          # 定义Docker Tag非法字符：/ : " \ | ? * 空格 （移除<>，因易触发语法错误，且Docker本身也禁止）
+          ILLEGAL_CHARS='[\/:\"\|\?\* ]'
+          # 用grep校验Tag是否包含非法字符（兼容所有bash版本）
+          if echo "${{ steps.set_tag.outputs.IMAGE_TAG }}" | grep -qE "$ILLEGAL_CHARS"; then
+              echo "错误：镜像Tag包含非法字符！禁止的字符：/ : \" \ | ? * 空格"
               exit 1
           fi
+          # 构建镜像（确保Tag合法）
           docker build -t ${{ steps.set_tag.outputs.IMAGE_NAME }}:${{ steps.set_tag.outputs.IMAGE_TAG }} .
 
       - name: Save image to tar file
