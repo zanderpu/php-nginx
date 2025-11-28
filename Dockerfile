@@ -31,14 +31,13 @@ RUN apk update && apk add --no-cache \
     chown -R ${NGINX_USER}:${NGINX_USER} /var/www/html /run/nginx /var/log/php-fpm && \
     chmod 755 /var/www/html
 
-# 5. 配置 PHP-FPM（适配 Alpine 路径）
+# 5. 配置 PHP-FPM（适配 Alpine 路径，关键：单行sed命令，避免解析错误）
 # Alpine 中 PHP-FPM 配置文件路径：/etc/php82/php-fpm.d/www.conf（版本不同路径后缀不同）
-RUN sed -i \
-    -e 's/listen = 127.0.0.1:9000/listen = 9000/g' \          # 监听所有地址（简化配置）
-    -e 's/user = nobody/user = nginx/g' \                      # 运行用户改为 nginx（和Nginx统一）
+RUN sed -i -e 's/listen = 127.0.0.1:9000/listen = 9000/g' \
+    -e 's/user = nobody/user = nginx/g' \
     -e 's/group = nobody/group = nginx/g' \
-    -e 's/;clear_env = no/clear_env = no/g' \                  # 保留环境变量（可选）
-    -e 's/pm.max_children = 5/pm.max_children = 20/g' \       # 调整进程数（按需）
+    -e 's/;clear_env = no/clear_env = no/g' \
+    -e 's/pm.max_children = 5/pm.max_children = 20/g' \
     /etc/php${PHP_VERSION}/php-fpm.d/www.conf && \
     # 关闭 PHP-FPM 后台运行（必须前台运行，否则容器会退出）
     sed -i 's/;daemonize = yes/daemonize = no/g' /etc/php${PHP_VERSION}/php-fpm.conf
